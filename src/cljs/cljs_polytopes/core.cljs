@@ -10,52 +10,6 @@
    [cljs.core.async.macros :refer [go-loop go]]))
 
 (enable-console-print!)
-
-; (defn floor [x] (.floor js/Math x))
-
-; (defn translate [start-pos vel time]
-;   (floor (+ start-pos (* time vel))))
-
-(defn x-rotator-mat [alpha]
-  [[1 0 0] 
-   [0 (mtrx/cos alpha) (mtrx/sin alpha)]
-   [0 (- (mtrx/sin alpha)) (mtrx/cos alpha)]])
-
-(defn y-rotator-mat [alpha]
-  [
-   [(mtrx/cos alpha) 0 (mtrx/sin alpha)]
-   [0 1 0]
-   [(- (mtrx/sin alpha)) 0 (mtrx/cos alpha)]])
-(defn rotator-mat [alpha] (mtrx/mmul (x-rotator-mat alpha) (y-rotator-mat alpha)))
-
-(defn random-vertices [n]
-  (vec (repeatedly n
-    (fn [] [(rand) (rand) (rand)]))))
-
-
-(defn apply-forces-to-vertex-in-graph [graph vertices idx]
-  (print (first vertices))
-  (let
-    [neighbors (graph idx)
-     vertex (vertices idx)
-     sum-of-forces (reduce mtrx/add
-      (concat (for [neighbor neighbors]
-                (mtrx/mul -0.1 (mtrx/sub neighbor vertex)))
-              (for [other vertices]
-                (mtrx/mul 0.33 (mtrx/sub other vertex)))))
-    ]
-    
-))
-
-(defn apply-forces-to-graph [graph vertices]
-  (vec (map (partial apply-forces-to-vertex-in-graph graph vertices)
-    (range (count vertices)))))
-
-(defn detect-edges [graph]
-  (set (for [[a neighbours] graph
-              b neighbours]
-          (if (< a b) [a b] [b a]))))
-
 (def cube-vertices [
     [-1 -1 -1]
     [-1 -1 +1]
@@ -66,13 +20,6 @@
     [+1 +1 -1]
     [+1 +1 +1]
   ])
-(defn generate-projection-func [camera-zoom camera-z offset-x offset-y]
-  (fn [[x y z :as location]]
-    (let [z-factor (/ 1 (- z camera-z)) ]
-      [(+ offset-x (* camera-zoom z-factor x))
-       (+ offset-y (* camera-zoom z-factor y))]
-      )))
-(def project (generate-projection-func 1000 10 300 300))
 (def cube-edges [
     [0 4]
     [1 5]
@@ -88,22 +35,75 @@
     [6 7]
   ])
 
+; (defn floor [x] (.floor js/Math x))
+
+; (defn translate [start-pos vel time]
+;   (floor (+ start-pos (* time vel))))
+
+(defn x-rotator-mat [alpha]
+  [[1 0 0]
+   [0 (mtrx/cos alpha) (mtrx/sin alpha)]
+   [0 (- (mtrx/sin alpha)) (mtrx/cos alpha)]])
+
+(defn y-rotator-mat [alpha]
+  [
+   [(mtrx/cos alpha) 0 (mtrx/sin alpha)]
+   [0 1 0]
+   [(- (mtrx/sin alpha)) 0 (mtrx/cos alpha)]])
+(defn rotator-mat [alpha] (mtrx/mmul (x-rotator-mat alpha) (y-rotator-mat alpha)))
+
+(defn random-vertices [n]
+  (vec (repeatedly n
+    (fn [] (mtrx/mul 10 [(rand) (rand) (rand)])))))
+
+(defn generate-projection-func [camera-zoom camera-z offset-x offset-y]
+  (fn [[x y z :as location]]
+    (let [z-factor (/ 1 (- z camera-z)) ]
+      [(+ offset-x (* camera-zoom z-factor x))
+       (+ offset-y (* camera-zoom z-factor y))]
+      )))
+(def project (generate-projection-func 100 1 300 300))
+
+(defn apply-forces-to-vertex-in-graph [graph vertices idx]
+  (let
+    [neighbors (graph idx)
+     vertex (vertices idx)
+     sum-of-forces (reduce mtrx/add
+      (concat (for [neighbor neighbors]
+                (mtrx/mul -0.1 (mtrx/sub neighbor vertex)))
+              (for [other vertices]
+                (mtrx/mul +0.33 (mtrx/sub other vertex)))))
+    ]
+  (mtrx/normalise (mtrx/add (vertices idx) sum-of-forces))
+))
+
+(defn apply-forces-to-graph [graph vertices]
+  ;(print (first vertices))
+  (vec (map (partial apply-forces-to-vertex-in-graph graph vertices)
+    (range (count vertices)))))
+
+(defn detect-edges [graph]
+  (set (for [[a neighbours] graph
+              b neighbours]
+          (if (< a b) [a b] [b a]))))
+
+
 (def starting-state {
-  :cur-time 0 
+  :cur-time 0
   :graph (:graph shapes/dodecahedron)
-  :vertices (random-vertices (count (:graph shapes/dodecahedron)))  
+  :vertices (random-vertices (count (:graph shapes/dodecahedron)))
   })
 
 (defn reset-state [_ cur-time]
   (-> starting-state
       (assoc
-          :start-time cur-time          
+          :start-time cur-time
           :timer-running true)))
 
 
 (defn time-update [timestamp state]
   (-> state
-      (update :vertices (partial apply-forces-to-graph (:graph state)))     
+      (update :vertices (partial apply-forces-to-graph (:graph state)))
       (assoc :cur-time timestamp)))
 
 (defonce poly-state (atom starting-state))
@@ -112,7 +112,7 @@
   (let [new-state (swap! poly-state (partial time-update time))]
     (when (:timer-running new-state)
       (go
-       (<! (timeout 1))
+       (<! (timeout 100))
        (.requestAnimationFrame js/window time-loop)))))
 
 (defn start-game []
@@ -124,9 +124,9 @@
 
 
 (defn world [state]
-;  (let 
+;  (let
  ;   [plotted-vertices (vec (map (partial mtrx/mmul (rotator-mat (* (:cur-time state) 0.001))) next-gen-vertices))]
-    (assoc state      
+    (assoc state
       :plotted-vertices (:vertices state)));)
 
 
