@@ -34,22 +34,22 @@
 
 
 (defn apply-forces-to-vertex-in-graph [graph vertices idx]
-    (let
-
-      [l (count vertices)
-       neighbors (graph idx)
-       vertex (vertices idx)
-       sum-of-forces (reduce mtrx/add
-        (for [i (range l)]          
-          (mtrx/mmul (if (contains? neighbors i) 0.7 1)
-              (mtrx/sub (vertices idx) vertex)
-          )))
-      ]
-      (mtrx/normalise (mtrx/add sum-of-forces vertex))
-  ))
+  (print (first vertices))
+  (let
+    [neighbors (graph idx)
+     vertex (vertices idx)
+     sum-of-forces (reduce mtrx/add
+      (concat (for [neighbor neighbors]
+                (mtrx/mul -0.1 (mtrx/sub neighbor vertex)))
+              (for [other vertices]
+                (mtrx/mul 0.33 (mtrx/sub other vertex)))))
+    ]
+    
+))
 
 (defn apply-forces-to-graph [graph vertices]
-  (map (partial apply-forces-to-vertex-in-graph graph vertices) (range (count vertices))))
+  (vec (map (partial apply-forces-to-vertex-in-graph graph vertices)
+    (range (count vertices)))))
 
 (defn detect-edges [graph]
   (set (for [[a neighbours] graph
@@ -103,6 +103,7 @@
 
 (defn time-update [timestamp state]
   (-> state
+      (update :vertices (partial apply-forces-to-graph (:graph state)))     
       (assoc :cur-time timestamp)))
 
 (defonce poly-state (atom starting-state))
@@ -111,7 +112,7 @@
   (let [new-state (swap! poly-state (partial time-update time))]
     (when (:timer-running new-state)
       (go
-       (<! (timeout 30))
+       (<! (timeout 1))
        (.requestAnimationFrame js/window time-loop)))))
 
 (defn start-game []
@@ -123,12 +124,10 @@
 
 
 (defn world [state]
-  (let 
-    [next-gen-vertices (apply-forces-to-graph (:graph state) (:vertices state))
-     plotted-vertices (vec (map (partial mtrx/mmul (rotator-mat (/ (:cur-time state) 1000))) next-gen-vertices))]
-    (assoc state
-      :vertices next-gen-vertices
-      :plotted-vertices plotted-vertices)))
+;  (let 
+ ;   [plotted-vertices (vec (map (partial mtrx/mmul (rotator-mat (* (:cur-time state) 0.001))) next-gen-vertices))]
+    (assoc state      
+      :plotted-vertices (:vertices state)));)
 
 
 (defn main-template [_]
