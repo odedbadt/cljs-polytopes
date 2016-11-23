@@ -4,6 +4,7 @@
    [sablono.core :as sab :include-macros true]
    [monet.canvas :as canvas]
    [clojure.core.matrix :as mtrx :include-macros]
+   [clojure.core.matrix.random :as rnd :include-macros]
    [cljs-polytopes.shapes :as shapes]
    [cljs.core.async :refer [<! chan sliding-buffer put! close! timeout]])
   (:require-macros
@@ -53,12 +54,11 @@
 (defn rotator-mat [alpha] (mtrx/mmul (x-rotator-mat alpha) (y-rotator-mat alpha)))
 
 (defn random-vertices [n]
-  (vec (repeatedly n
-    (fn [] (mtrx/mul 10 [(rand) (rand) (rand)])))))
+  (rnd/sample-normal [n 3]))
 
 (defn generate-projection-func [camera-zoom camera-z offset-x offset-y]
   (fn [[x y z :as location]]
-    (let [z-factor (/ 1 (- z camera-z)) ]
+    (let [z-factor 1 ]
       [(+ offset-x (* camera-zoom z-factor x))
        (+ offset-y (* camera-zoom z-factor y))]
       )))
@@ -68,17 +68,20 @@
   (let
     [neighbors (graph idx)
      vertex (vertices idx)
-     sum-of-forces (reduce mtrx/add
-      (concat (for [neighbor neighbors]
-                (mtrx/mul -0.1 (mtrx/sub neighbor vertex)))
+     sum-of-forces 
+      (concat 
+              (for [neighbor neighbors]
+                (mtrx/mul -0.1 (mtrx/sub (vertices neighbor) vertex)))
               (for [other vertices]
-                (mtrx/mul +0.33 (mtrx/sub other vertex)))))
+                (mtrx/mul 0.33 (mtrx/sub other vertex)))
+      )
     ]
-  (mtrx/normalise (mtrx/add (vertices idx) sum-of-forces))
+  (mtrx/normalise 
+      (reduce mtrx/add (vertices idx) sum-of-forces)
+   )
 ))
 
 (defn apply-forces-to-graph [graph vertices]
-  ;(print (first vertices))
   (vec (map (partial apply-forces-to-vertex-in-graph graph vertices)
     (range (count vertices)))))
 
@@ -91,14 +94,21 @@
 (def starting-state {
   :cur-time 0
   :graph (:graph shapes/dodecahedron)
-  :vertices (random-vertices (count (:graph shapes/dodecahedron)))
+  :vertices (:coordinates shapes/dodecahedron)
+  :timer-running true
   })
 
-(defn reset-state [_ cur-time]
-  (-> starting-state
+(defn go [state]
+  (-> state
       (assoc
-          :start-time cur-time
           :timer-running true)))
+
+(defn reset-vertices [randomize state]
+  (-> state
+    (assoc
+      :vertices (if randomize
+                   (random-vertices (count (:vertices state) ))
+                   (:vertices starting-state)))))
 
 
 (defn time-update [timestamp state]
@@ -109,29 +119,43 @@
 (defonce poly-state (atom starting-state))
 
 (defn time-loop [time]
-  (let [new-state (swap! poly-state (partial time-update time))]
+  (let [
+    new-state (swap! poly-state (partial time-update time))    
+    ]
     (when (:timer-running new-state)
       (go
-       (<! (timeout 100))
-       (.requestAnimationFrame js/window time-loop)))))
+       (<! (timeout 30))
+       (.requestAnimationFrame js/window time-loop)
+       ))))
 
 (defn start-game []
   (.requestAnimationFrame
    js/window
-   (fn [time]
-     (reset! poly-state (reset-state @poly-state time))
+   (fn [time]      
      (time-loop time))))
 
 
 (defn world [state]
-;  (let
- ;   [plotted-vertices (vec (map (partial mtrx/mmul (rotator-mat (* (:cur-time state) 0.001))) next-gen-vertices))]
-    (assoc state
-      :plotted-vertices (:vertices state)));)
+  (assoc state
+    :plotted-vertices (:vertices state)));)
 
-
+(defn reset []
+  (swap! poly-state (partial reset-vertices false)
+  ))
+(defn step []
+  (swap! poly-state (partial time-update 0)
+  ))
+(defn debug-print []
+  (print (:vertices @poly-state))
+  )
 (defn main-template [_]
-  (sab/html [:canvas#main-canvas {:width 600 :height 600}]))
+  (sab/html [:div.board
+    [:canvas#main-canvas {:width 600 :height 600}]
+    [:button {:onClick reset} "Reset"]
+    [:button {:onClick #(swap! poly-state (partial reset-vertices true))} "Random"]
+    [:button {:onClick step} "Step"]
+    [:button {:onClick debug-print} "Debug"]
+    [:button {:onClick go} "Go"]]))
 
 (let [node (.getElementById js/document "main-area")]
   (defn renderer [full-state]
@@ -151,9 +175,7 @@
 
 
 
-(add-watch poly-state :renderer (fn [_ _ _ n]
-                                  (renderer (world n))))
+(add-watch poly-state :renderer (fn [_ _ _ state]
+                                  (renderer (world state))))
 
-
-(reset! poly-state @poly-state)
 (start-game)
