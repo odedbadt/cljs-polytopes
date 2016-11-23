@@ -58,11 +58,11 @@
 
 (defn generate-projection-func [camera-zoom camera-z offset-x offset-y]
   (fn [[x y z :as location]]
-    (let [z-factor 1 ]
+    (let [z-factor (/ 1 (- z camera-z)) ]
       [(+ offset-x (* camera-zoom z-factor x))
        (+ offset-y (* camera-zoom z-factor y))]
       )))
-(def project (generate-projection-func 100 1 300 300))
+(def project (generate-projection-func 400 3 300 300))
 
 (defn apply-forces-to-vertex-in-graph [graph vertices idx]
   (let
