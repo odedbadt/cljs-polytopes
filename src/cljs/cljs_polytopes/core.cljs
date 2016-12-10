@@ -137,7 +137,10 @@
 
 (defn world [state]
   (assoc state
-    :plotted-vertices (:vertices state)));)
+    :plotted-vertices 
+      (vec (map
+        (partial mtrx/mmul (rotator-mat (/ (:cur-time state) 10000)))
+                 (:vertices state)))))
 
 (defn reset []
   (swap! poly-state (partial reset-vertices false)
