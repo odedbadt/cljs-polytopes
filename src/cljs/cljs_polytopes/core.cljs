@@ -181,4 +181,4 @@
 (add-watch poly-state :renderer (fn [_ _ _ state]
                                   (renderer (world state))))
 
-(start-game)
+;(start-game)
