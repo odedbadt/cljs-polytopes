@@ -1,6 +1,6 @@
 (defproject cljs-polytopes "0.1.1-SNAPSHOT"
   :description "Polytopes demo"
-  
+
   :url "http://rigsomelight.com/2014/05/01/interactive-programming-flappy-bird-clojurescript.html"
 
   :dependencies [[org.clojure/clojure "1.8.0"]
@@ -10,6 +10,7 @@
                  [sablono "0.4.0"]
                  [rm-hull/monet "0.3.0"]
                  [thinktopic/aljabr "0.1.1"]
+                 [org.clojure/tools.trace "0.7.9"]
                  [net.mikera/core.matrix "0.56.0"]]
 
   :plugins [[lein-cljsbuild "1.1.5"]
@@ -18,10 +19,10 @@
 
   :clean-targets ^{:protect false} ["resources/public/js/out"
                                     "resources/public/js/cljs-polytopes.js"
-                                    :target-path]  
-  
+                                    :target-path]
+
   :source-paths ["src/cljc"]
-  :cljsbuild { 
+  :cljsbuild {
     :builds [{:id "dev"
               :source-paths ["src/cljs" "src/cljc" "test/cljs"]
               :figwheel true
@@ -41,7 +42,7 @@
               ;            :source-map true
               ;            :cache-analysis true }}
               ]}
-  
+
   :figwheel { :css-dirs ["resources/public/css"]
               :open-file-command "subl"
              })
